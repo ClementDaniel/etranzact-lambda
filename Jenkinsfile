@@ -1,5 +1,5 @@
 pipeline {
-    agent any
+    agent { docker { image 'public.ecr.aws/sam/build-nodejs20.x' } }
 
     environment {
         AWS_REGION = 'us-east-1'  // Change to your AWS region
@@ -25,9 +25,7 @@ pipeline {
 
         stage('Prepare Build Environment') {
             steps {
-                sh '''
-                    chmod +x mvnw  # Ensure the Maven Wrapper is executable
-                '''
+                sh 'chmod +x mvnw'  // Ensure the Maven Wrapper is executable
             }
         }
 
@@ -40,36 +38,11 @@ pipeline {
             }
         }
 
-        stage('Install AWS CLI') {
+        stage('Build & Deploy with SAM') {
             steps {
                 sh '''
-                    if ! command -v aws &> /dev/null; then
-                        echo "AWS CLI not found. Installing..."
-                         apt update-y
-                         apt install -y awscli
-                    else
-                        echo "AWS CLI already installed."
-                    fi
-                    aws --version
-                '''
-            }
-        }
-
-        stage('Upload to S3') {
-            steps {
-                sh '''
-                    ARTIFACT=$(ls target/*.jar | head -n 1)
-                    aws s3 cp $ARTIFACT s3://$S3_BUCKET/
-                    echo "Uploaded $ARTIFACT to S3"
-                '''
-            }
-        }
-
-        stage('Deploy to AWS Lambda') {
-            steps {
-                sh '''
-                    ARTIFACT=$(ls target/*.jar | head -n 1)
-                    aws lambda update-function-code --function-name $AWS_LAMBDA_FUNCTION_NAME --s3-bucket $S3_BUCKET --s3-key $(basename $ARTIFACT)
+                    sam build
+                    sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
                 '''
             }
         }

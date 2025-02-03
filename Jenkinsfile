@@ -2,12 +2,9 @@ pipeline {
     agent any
 
     environment {
-        # Load variables from .env file
-        AWS_REGION = credentials('AWS_REGION')
-        AWS_LAMBDA_FUNCTION_NAME = credentials('AWS_LAMBDA_FUNCTION_NAME')
-        S3_BUCKET = credentials('S3_BUCKET')
-        JDK_VERSION = credentials('JDK_VERSION')
-        MAVEN_VERSION = credentials('MAVEN_VERSION')
+        AWS_REGION = 'us-east-1'  // Change to your AWS region
+        AWS_LAMBDA_FUNCTION_NAME = 'etranzactFunction'
+        S3_BUCKET = 'etranzact'  // Replace with your S3 bucket
     }
 
     stages {
@@ -20,16 +17,25 @@ pipeline {
         stage('Set Up Java & Maven') {
             steps {
                 script {
-                    def javaHome = tool name: "JDK ${JDK_VERSION}", type: 'jdk'
+                    def javaHome = tool name: 'JDK 17', type: 'jdk'  // Ensure JDK 17 is installed
                     env.PATH = "${javaHome}/bin:${env.PATH}"
                 }
             }
         }
 
+        stage('Prepare Build Environment') {
+            steps {
+                sh '''
+                    chmod +x mvnw  # Ensure the Maven Wrapper is executable
+                '''
+            }
+        }
+
         stage('Build & Test') {
             steps {
-                withMaven(maven: "Maven ${MAVEN_VERSION}") {
-                    sh 'mvn clean package'
+                script {
+                    sh './mvnw compile quarkus:dev & sleep 30'  // Run Quarkus dev mode for 30s
+                    sh './mvnw clean package'  // Package the application
                 }
             }
         }

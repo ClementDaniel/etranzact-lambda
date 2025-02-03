@@ -1,10 +1,6 @@
 pipeline {
-    agent {
-        docker {
-            image 'public.ecr.aws/sam/build-java17'  // Use Java-compatible AWS SAM image
-        }
-    }
-
+    agent any
+    
     environment {
         AWS_REGION = 'us-east-1'  // Change to your AWS region
         AWS_LAMBDA_FUNCTION_NAME = 'etranzactFunction'

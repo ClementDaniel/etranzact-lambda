@@ -45,8 +45,8 @@ pipeline {
                 sh '''
                     if ! command -v aws &> /dev/null; then
                         echo "AWS CLI not found. Installing..."
-                        apt update
-                        apt install -y awscli
+                        yum update-y
+                        yum install -y awscli
                     else
                         echo "AWS CLI already installed."
                     fi

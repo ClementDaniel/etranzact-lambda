@@ -25,7 +25,9 @@ pipeline {
 
         stage('Prepare Build Environment') {
             steps {
-                sh 'chmod +x mvnw'  // Ensure Maven Wrapper is executable
+                sh '''
+                    chmod +x mvnw  # Ensure the Maven Wrapper is executable
+                '''
             }
         }
 
@@ -38,41 +40,27 @@ pipeline {
             }
         }
 
-        stage('Install AWS SAM CLI') {
+        stage('Install AWS CLI') {
             steps {
                 sh '''
-                    if ! command -v sam &> /dev/null; then
-                        echo "AWS SAM CLI not found. Installing..."
-                        if command -v yum &> /dev/null; then
-                            sudo yum update -y
-                            sudo yum install -y aws-sam-cli
-                        elif command -v apt-get &> /dev/null; then
-                            sudo apt-get update
-                            sudo apt-get install -y aws-sam-cli
-                        else
-                            echo "No supported package manager found!"
-                            exit 1
-                        fi
+                    if ! command -v aws &> /dev/null; then
+                        echo "AWS CLI not found. Installing..."
+                         apt update-y
+                         apt install -y awscli
                     else
-                        echo "AWS SAM CLI already installed."
+                        echo "AWS CLI already installed."
                     fi
-                    sam --version
+                    aws --version
                 '''
             }
         }
 
-        stage('Build with SAM') {
+        stage('Upload to S3') {
             steps {
                 sh '''
-                    sam build --use-container
-                '''
-            }
-        }
-
-        stage('Package & Upload to S3') {
-            steps {
-                sh '''
-                    sam package --s3-bucket $S3_BUCKET --output-template-file packaged.yaml
+                    ARTIFACT=$(ls target/*.jar | head -n 1)
+                    aws s3 cp $ARTIFACT s3://$S3_BUCKET/
+                    echo "Uploaded $ARTIFACT to S3"
                 '''
             }
         }
@@ -80,7 +68,8 @@ pipeline {
         stage('Deploy to AWS Lambda') {
             steps {
                 sh '''
-                    sam deploy --template-file packaged.yaml --stack-name $AWS_LAMBDA_FUNCTION_NAME --capabilities CAPABILITY_IAM --region $AWS_REGION
+                    ARTIFACT=$(ls target/*.jar | head -n 1)
+                    aws lambda update-function-code --function-name $AWS_LAMBDA_FUNCTION_NAME --s3-bucket $S3_BUCKET --s3-key $(basename $ARTIFACT)
                 '''
             }
         }

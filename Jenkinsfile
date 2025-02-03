@@ -1,6 +1,9 @@
 pipeline {
-    agent any
-    agent { docker { image 'public.ecr.aws/sam/build-nodejs20.x' } }
+    agent {
+        docker {
+            image 'public.ecr.aws/sam/build-java17'  // Use Java-compatible AWS SAM image
+        }
+    }
 
     environment {
         AWS_REGION = 'us-east-1'  // Change to your AWS region
@@ -15,27 +18,13 @@ pipeline {
             }
         }
 
-        stage('Set Up Java & Maven') {
-            steps {
-                script {
-                    def javaHome = tool name: 'jdk-17', type: 'jdk'  // Ensure JDK 17 is installed
-                    env.PATH = "${javaHome}/bin:${env.PATH}"
-                }
-            }
-        }
-
-        stage('Prepare Build Environment') {
-            steps {
-                sh 'chmod +x mvnw'  // Ensure the Maven Wrapper is executable
-            }
-        }
-
         stage('Build & Test') {
             steps {
-                script {
-                    sh './mvnw compile quarkus:dev & sleep 30'  // Run Quarkus dev mode for 30s
-                    sh './mvnw clean package'  // Package the application
-                }
+                sh '''
+                    chmod +x mvnw  # Ensure Maven Wrapper is executable
+                    ./mvnw compile quarkus:dev & sleep 30  # Run Quarkus dev mode for 30s
+                    ./mvnw clean package  # Package the application
+                '''
             }
         }
 

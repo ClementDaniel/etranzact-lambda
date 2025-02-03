@@ -1,4 +1,5 @@
 pipeline {
+    agent any
     agent { docker { image 'public.ecr.aws/sam/build-nodejs20.x' } }
 
     environment {

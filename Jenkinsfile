@@ -2,9 +2,12 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-1'  // Change to your AWS region
-        AWS_LAMBDA_FUNCTION_NAME = 'etranzactFunction'
-        S3_BUCKET = 'etranzact'  // Replace with your S3 bucket
+        # Load variables from .env file
+        AWS_REGION = credentials('AWS_REGION')
+        AWS_LAMBDA_FUNCTION_NAME = credentials('AWS_LAMBDA_FUNCTION_NAME')
+        S3_BUCKET = credentials('S3_BUCKET')
+        JDK_VERSION = credentials('JDK_VERSION')
+        MAVEN_VERSION = credentials('MAVEN_VERSION')
     }
 
     stages {
@@ -17,18 +20,19 @@ pipeline {
         stage('Set Up Java & Maven') {
             steps {
                 script {
-                    def javaHome = tool name: 'JDK 17', type: 'jdk'  // Ensure JDK is installed in Jenkins
+                    def javaHome = tool name: "JDK ${JDK_VERSION}", type: 'jdk'
                     env.PATH = "${javaHome}/bin:${env.PATH}"
                 }
             }
         }
+
         stage('Build & Test') {
-    steps {
-        withMaven(maven: 'Maven 3.8.6') {
-            sh 'mvn clean package'
+            steps {
+                withMaven(maven: "Maven ${MAVEN_VERSION}") {
+                    sh 'mvn clean package'
+                }
+            }
         }
-    }
-}
 
         stage('Upload to S3') {
             steps {

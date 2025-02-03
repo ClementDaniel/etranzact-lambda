@@ -40,6 +40,21 @@ pipeline {
             }
         }
 
+        stage('Install AWS CLI') {
+            steps {
+                sh '''
+                    if ! command -v aws &> /dev/null; then
+                        echo "AWS CLI not found. Installing..."
+                        sudo apt update
+                        sudo apt install -y awscli
+                    else
+                        echo "AWS CLI already installed."
+                    fi
+                    aws --version
+                '''
+            }
+        }
+
         stage('Upload to S3') {
             steps {
                 sh '''

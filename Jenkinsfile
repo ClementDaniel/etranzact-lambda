@@ -17,7 +17,7 @@ pipeline {
         stage('Set Up Java & Maven') {
             steps {
                 script {
-                    def javaHome = tool name: 'JDK 17', type: 'jdk'  // Ensure JDK 17 is installed
+                    def javaHome = tool name: 'jdk-17', type: 'jdk'  // Ensure JDK 17 is installed
                     env.PATH = "${javaHome}/bin:${env.PATH}"
                 }
             }

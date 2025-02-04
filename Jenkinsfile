@@ -5,7 +5,7 @@ pipeline {
         AWS_REGION = 'us-east-1'
         AWS_LAMBDA_FUNCTION_NAME = 'etranzactFunction'
         S3_BUCKET = 'etranzact'  // Replace with your S3 bucket
-        SAM_CLI_PATH = "$HOME/.local/bin/sam"  // Set default AWS SAM path
+        SAM_CLI_PATH = "$HOME/.local/bin/sam"  // Custom installation path
     }
 
     stages {
@@ -34,15 +34,15 @@ pipeline {
                         mkdir -p sam-installation
                         unzip -o aws-sam-cli-linux.zip -d sam-installation  # Force overwrite
                         ./sam-installation/install --install-dir $HOME/.local/bin
+                        chmod +x $HOME/.local/bin/sam  # Fix missing executable permissions
                         echo "AWS SAM installed successfully."
                     else
                         echo "AWS SAM already installed."
                     fi
-                    $HOME/.local/bin/sam --version
+                    export PATH="$HOME/.local/bin:$PATH"
+                    echo "Checking SAM Version..."
+                    sam --version  # Ensure Jenkins can find and execute it
                 '''
-                script {
-                    env.PATH = "$HOME/.local/bin:$PATH"  // Ensure Jenkins finds SAM CLI
-                }
             }
         }
 

@@ -30,7 +30,9 @@ pipeline {
                     if ! command -v sam &> /dev/null; then
                         echo "Installing AWS SAM CLI..."
                         curl -Lo aws-sam-cli-linux.zip https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip
-                        unzip aws-sam-cli-linux.zip -d sam-installation
+                        rm -rf sam-installation  # Remove old installation if exists
+                        mkdir -p sam-installation
+                        unzip -o aws-sam-cli-linux.zip -d sam-installation  # Force overwrite
                         sudo./sam-installation/install
                         echo "AWS SAM installed successfully."
                     else

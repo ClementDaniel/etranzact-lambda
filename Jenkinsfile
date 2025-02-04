@@ -31,7 +31,7 @@ pipeline {
                         echo "Installing AWS SAM CLI..."
                         curl -Lo aws-sam-cli-linux.zip https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip
                         unzip aws-sam-cli-linux.zip -d sam-installation
-                        ./sam-installation/install
+                        sudo./sam-installation/install
                         echo "AWS SAM installed successfully."
                     else
                         echo "AWS SAM already installed."

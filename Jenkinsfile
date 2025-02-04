@@ -5,7 +5,7 @@ pipeline {
         AWS_REGION = 'us-east-1'
         AWS_LAMBDA_FUNCTION_NAME = 'etranzactFunction'
         S3_BUCKET = 'etranzact'  // Replace with your S3 bucket
-        SAM_CLI_PATH = "$HOME/.local/bin/sam"  // Custom installation path
+        SAM_CLI_PATH = '/usr/local/bin/sam'  // Set default AWS SAM path
     }
 
     stages {
@@ -24,26 +24,23 @@ pipeline {
             }
         }
 
-        stage('Install AWS SAM Without Sudo') {
+        stage('Install AWS SAM') {
             steps {
                 sh '''
-                    echo "Checking if AWS SAM CLI is installed..."
                     if ! command -v sam &> /dev/null; then
                         echo "Installing AWS SAM CLI..."
                         curl -Lo aws-sam-cli-linux.zip https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip
-                        rm -rf sam-installation  # Remove old installation if exists
-                        mkdir -p sam-installation
-                        unzip -o aws-sam-cli-linux.zip -d sam-installation  # Force overwrite
-                        ./sam-installation/install --install-dir $HOME/.local/bin --update
-                        chmod +x $HOME/.local/bin/sam  # Ensure it's executable
+                        unzip aws-sam-cli-linux.zip -d sam-installation
+                        sudo ./sam-installation/install
                         echo "AWS SAM installed successfully."
                     else
-                        echo "AWS SAM is already installed."
+                        echo "AWS SAM already installed."
                     fi
-                    export PATH="$HOME/.local/bin:$PATH"
-                    echo "Checking SAM Version..."
-                    sam --version  # Ensure Jenkins can find and execute it
+                    sam --version
                 '''
+                script {
+                    env.PATH = "/usr/local/bin:$PATH"  // Ensure Jenkins finds SAM CLI
+                }
             }
         }
 
@@ -60,7 +57,7 @@ pipeline {
         stage('Build & Deploy with SAM') {
             steps {
                 sh '''
-                    export PATH="$HOME/.local/bin:$PATH"  # Ensure Jenkins finds SAM
+                    export PATH="/usr/local/bin:$PATH"  # Ensure Jenkins finds SAM
                     sam build
                     sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
                 '''

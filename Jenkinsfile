@@ -4,8 +4,8 @@ pipeline {
     environment {
         AWS_REGION = 'us-east-1'
         AWS_LAMBDA_FUNCTION_NAME = 'etranzactFunction'
-        S3_BUCKET = 'etranzact'
-        SAM_CLI_PATH = "$HOME/.local/bin/sam"  // AWS SAM CLI Path
+        S3_BUCKET = 'etranzact'  // Replace with your S3 bucket
+        SAM_CLI_PATH = '/usr/local/bin/sam'  // Set default AWS SAM path
     }
 
     stages {
@@ -24,33 +24,22 @@ pipeline {
             }
         }
 
-        stage('Install Python & AWS SAM') {
+        stage('Install AWS SAM') {
             steps {
                 sh '''
-                    # Install Python 3 if missing
-                    if ! command -v python3 &> /dev/null; then
-                        echo "Python 3 is missing! Install it manually on the Jenkins agent."
-                        exit 1
-                    fi
-
-                    # Ensure pip is installed
-                    python3 -m ensurepip --default-pip
-                    python3 -m pip install --upgrade pip
-                    
-                    # Install AWS SAM CLI if missing
                     if ! command -v sam &> /dev/null; then
                         echo "Installing AWS SAM CLI..."
-                        python3 -m pip install --user aws-sam-cli
+                        curl -Lo aws-sam-cli-linux.zip https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip
+                        unzip aws-sam-cli-linux.zip -d sam-installation
+                        ./sam-installation/install
                         echo "AWS SAM installed successfully."
                     else
                         echo "AWS SAM already installed."
                     fi
-
-                    # Verify AWS SAM installation
-                    $HOME/.local/bin/sam --version
+                    /usr/local/bin/sam --version
                 '''
                 script {
-                    env.PATH = "$HOME/.local/bin:$PATH"
+                    env.PATH = "/usr/local/bin:$PATH"  // Ensure Jenkins finds SAM CLI
                 }
             }
         }
@@ -59,25 +48,16 @@ pipeline {
             steps {
                 sh '''
                     chmod +x mvnw  # Ensure Maven Wrapper is executable
-                    ./mvnw clean package  # Build Java Lambda
+                    ./mvnw compile quarkus:dev & sleep 30  # Run Quarkus dev mode for 30s
+                    ./mvnw clean package  # Package the application
                 '''
             }
         }
 
-        stage('Upload to S3') {
+        stage('Build & Deploy with SAM') {
             steps {
                 sh '''
-                    ARTIFACT=$(ls target/*.jar | head -n 1)
-                    aws s3 cp $ARTIFACT s3://$S3_BUCKET/
-                    echo "Uploaded $ARTIFACT to S3"
-                '''
-            }
-        }
-
-        stage('Deploy with AWS SAM') {
-            steps {
-                sh '''
-                    export PATH="$HOME/.local/bin:$PATH"  # Ensure Jenkins finds SAM
+                    export PATH="/usr/local/bin:$PATH"  # Ensure Jenkins finds SAM
                     sam build
                     sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
                 '''
@@ -97,3 +77,16 @@ pipeline {
 
 
 
+
+
+pipeline {
+    agent { docker { image 'public.ecr.aws/sam/build-java17' } }
+    stages {
+        stage('build') {
+            steps {
+                sh 'sam build'
+                sh 'sam deploy --no-confirm-changeset --no-fail-on-empty-changeset'
+            }
+        }
+    }
+}

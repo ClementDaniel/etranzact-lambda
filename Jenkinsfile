@@ -38,7 +38,7 @@ pipeline {
                     else
                         echo "AWS SAM already installed."
                     fi
-                    /usr/local/bin/sam --version
+                    # /usr/local/bin/sam --version
                 '''
                 script {
                     env.PATH = "/usr/local/bin:$PATH"  // Ensure Jenkins finds SAM CLI

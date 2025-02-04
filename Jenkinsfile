@@ -1,11 +1,11 @@
 pipeline {
-    agent any  // Runs on any available Jenkins agent
+    agent any  
 
     environment {
         AWS_REGION = 'us-east-1'
         AWS_LAMBDA_FUNCTION_NAME = 'etranzactFunction'
-        S3_BUCKET = 'etranzact'  // Replace with your S3 bucket
-        SAM_CLI_PATH = "$HOME/.local/bin/sam"  // Install SAM CLI in a user directory
+        S3_BUCKET = 'etranzact'
+        SAM_CLI_PATH = "$HOME/.local/bin/sam"
     }
 
     stages {
@@ -18,7 +18,7 @@ pipeline {
         stage('Install Java & Maven') {
             steps {
                 script {
-                    def javaHome = tool name: 'jdk-17', type: 'jdk'  // Ensure JDK 17 is installed
+                    def javaHome = tool name: 'jdk-17', type: 'jdk'
                     env.PATH = "${javaHome}/bin:${env.PATH}"
                 }
             }
@@ -27,9 +27,17 @@ pipeline {
         stage('Install AWS SAM CLI (via pip)') {
             steps {
                 sh '''
+                    # Ensure pip is installed
+                    if ! command -v pip &> /dev/null; then
+                        echo "Installing pip..."
+                        python3 -m ensurepip --default-pip
+                        python3 -m pip install --upgrade pip
+                    fi
+
+                    # Install AWS SAM CLI if not installed
                     if ! command -v sam &> /dev/null; then
                         echo "Installing AWS SAM CLI using pip..."
-                        pip install --user aws-sam-cli
+                        python3 -m pip install --user aws-sam-cli
                         echo "AWS SAM installed successfully."
                     else
                         echo "AWS SAM already installed."
@@ -37,7 +45,7 @@ pipeline {
                     $HOME/.local/bin/sam --version
                 '''
                 script {
-                    env.PATH = "$HOME/.local/bin:$PATH"  // Ensure Jenkins finds SAM CLI
+                    env.PATH = "$HOME/.local/bin:$PATH"
                 }
             }
         }
@@ -45,9 +53,8 @@ pipeline {
         stage('Build & Test Application') {
             steps {
                 sh '''
-                    chmod +x mvnw  # Ensure Maven Wrapper is executable
-                    ./mvnw clean package  # Build the application
-                    ./mvnw clean package'  // Package the application
+                    chmod +x mvnw  
+                    ./mvnw clean package  
                 '''
             }
         }
@@ -55,7 +62,7 @@ pipeline {
         stage('Build & Deploy with AWS SAM') {
             steps {
                 sh '''
-                    export PATH="$HOME/.local/bin:$PATH"  # Ensure SAM CLI is found
+                    export PATH="$HOME/.local/bin:$PATH"
                     sam build
                     sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
                 '''

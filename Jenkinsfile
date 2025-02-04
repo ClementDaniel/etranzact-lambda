@@ -5,7 +5,7 @@ pipeline {
         AWS_REGION = 'us-east-1'
         AWS_LAMBDA_FUNCTION_NAME = 'etranzactFunction'
         S3_BUCKET = 'etranzact'  // Replace with your S3 bucket
-        SAM_CLI_PATH = '/usr/local/bin/sam'  // Set default AWS SAM path
+        SAM_CLI_PATH = '/usr/local/bin/sam'  // Path to AWS SAM CLI
     }
 
     stages {
@@ -24,14 +24,14 @@ pipeline {
             }
         }
 
-        stage('Install AWS SAM') {
+        stage('Install AWS SAM CLI') {
             steps {
                 sh '''
                     if ! command -v sam &> /dev/null; then
                         echo "Installing AWS SAM CLI..."
                         curl -Lo aws-sam-cli-linux.zip https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip
                         unzip aws-sam-cli-linux.zip -d sam-installation
-                        sudo ./sam-installation/install
+                        ./sam-installation/install
                         echo "AWS SAM installed successfully."
                     else
                         echo "AWS SAM already installed."
@@ -44,20 +44,19 @@ pipeline {
             }
         }
 
-        stage('Build & Test') {
+        stage('Build & Test Application') {
             steps {
                 sh '''
                     chmod +x mvnw  # Ensure Maven Wrapper is executable
-                    ./mvnw compile quarkus:dev & sleep 30  # Run Quarkus dev mode for 30s
-                    ./mvnw clean package  # Package the application
+                    ./mvnw clean package  # Build the application
                 '''
             }
         }
 
-        stage('Build & Deploy with SAM') {
+        stage('Build & Deploy with AWS SAM (Docker)') {
+            agent { docker { image 'public.ecr.aws/sam/build-java17' } }
             steps {
                 sh '''
-                    export PATH="/usr/local/bin:$PATH"  # Ensure Jenkins finds SAM
                     sam build
                     sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
                 '''

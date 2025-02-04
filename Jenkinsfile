@@ -1,102 +1,78 @@
+
+
 pipeline {
-    agent any
+    agent any  // Runs on any available Jenkins agent
+
     environment {
         AWS_REGION = 'us-east-1'
         AWS_LAMBDA_FUNCTION_NAME = 'etranzactFunction'
-        S3_BUCKET = 'etranzact'
-        SAM_INSTALL_DIR = "${WORKSPACE}/.sam-cli"
+        S3_BUCKET = 'etranzact'  // Replace with your S3 bucket
+        SAM_CLI_PATH = '/usr/local/bin/sam'  // Set default AWS SAM path
     }
 
     stages {
         stage('Checkout Code') {
             steps {
-                git url: 'https://github.com/ClementDaniel/etranzact-lambda.git', 
-                    branch: 'main'
+                git 'https://github.com/ClementDaniel/etranzact-lambda.git'
             }
         }
 
-        stage('Setup Java') {
+        stage('Install Java & Maven') {
             steps {
                 script {
-                    def javaHome = tool name: 'jdk-17', type: 'jdk'
+                    def javaHome = tool name: 'jdk-17', type: 'jdk'  // Ensure JDK 17 is installed
                     env.PATH = "${javaHome}/bin:${env.PATH}"
                 }
-                sh 'java -version'
             }
         }
 
         stage('Install AWS SAM') {
             steps {
                 sh '''
-                    # Clean previous installations
-                    rm -rf aws-sam-cli-linux.zip sam-installation "${SAM_INSTALL_DIR}"
-                    
                     if ! command -v sam &> /dev/null; then
-                        echo "=== Installing AWS SAM CLI ==="
+                        echo "Installing AWS SAM CLI..."
                         curl -Lo aws-sam-cli-linux.zip https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip
-                        unzip -o aws-sam-cli-linux.zip -d sam-installation
-                        
-                        # Install to workspace directory
-                        mkdir -p "${SAM_INSTALL_DIR}"
-                        ./sam-installation/install --install-dir "${SAM_INSTALL_DIR}" --update-path
-                        
-                        echo "=== SAM CLI installed to ${SAM_INSTALL_DIR} ==="
+                        unzip aws-sam-cli-linux.zip -d sam-installation
+                        ./sam-installation/install
+                        echo "AWS SAM installed successfully."
                     else
-                        echo "=== SAM CLI already installed ==="
+                        echo "AWS SAM already installed."
                     fi
+                    sam --version
                 '''
                 script {
-                    env.PATH = "${env.SAM_INSTALL_DIR}/dist:${env.PATH}"
+                    env.PATH = "/usr/local/bin:$PATH"  // Ensure Jenkins finds SAM CLI
                 }
-                sh 'sam --version'
             }
         }
 
         stage('Build & Test') {
             steps {
                 sh '''
-                    echo "=== Building Application ==="
-                    chmod +x mvnw
-                    ./mvnw clean package
-                    
-                    echo "=== Running Tests ==="
-                    ./mvnw test
+                    chmod +x mvnw  # Ensure Maven Wrapper is executable
+                    ./mvnw compile quarkus:dev & sleep 30  # Run Quarkus dev mode for 30s
+                    ./mvnw clean package  # Package the application
                 '''
             }
         }
 
-        stage('SAM Deploy') {
+        stage('Build & Deploy with SAM') {
             steps {
                 sh '''
-                    echo "=== Building SAM Application ==="
-                    sam build --use-container --template template.yaml
-                    
-                    echo "=== Deploying to AWS ==="
-                    sam deploy \
-                        --region ${AWS_REGION} \
-                        --stack-name ${AWS_LAMBDA_FUNCTION_NAME} \
-                        --s3-bucket ${S3_BUCKET} \
-                        --capabilities CAPABILITY_IAM \
-                        --no-confirm-changeset \
-                        --no-fail-on-empty-changeset
+                    export PATH="/usr/local/bin:$PATH"  # Ensure Jenkins finds SAM
+                    sam build
+                    sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
                 '''
             }
         }
     }
 
     post {
-        always {
-            sh '''
-                echo "=== Cleaning up ==="
-                rm -rf aws-sam-cli-linux.zip sam-installation
-            '''
-        }
         success {
-            slackSend color: 'good', message: "Deployment succeeded: ${env.JOB_NAME} ${env.BUILD_NUMBER}"
+            echo 'Deployment successful!'
         }
         failure {
-            slackSend color: 'danger', message: "Deployment failed: ${env.JOB_NAME} ${env.BUILD_NUMBER}"
-            archiveArtifacts artifacts: '**/target/*.log', allowEmptyArchive: true
+            echo 'Deployment failed. Check logs for details.'
         }
     }
 }

@@ -33,7 +33,7 @@ pipeline {
                         rm -rf sam-installation  # Remove old installation if exists
                         mkdir -p sam-installation
                         unzip -o aws-sam-cli-linux.zip -d sam-installation  # Force overwrite
-                        sudo./sam-installation/install
+                        # sudo./sam-installation/install
                         echo "AWS SAM installed successfully."
                     else
                         echo "AWS SAM already installed."

@@ -54,7 +54,7 @@ pipeline {
         }
 
         stage('Build & Deploy with AWS SAM (Docker)') {
-            agent { docker { image 'public.ecr.aws/sam/build-java17' } }
+            agent { { image 'public.ecr.aws/sam/build-java17' } }
             steps {
                 sh '''
                     sam build

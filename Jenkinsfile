@@ -27,17 +27,18 @@ pipeline {
         stage('Install AWS SAM Without Sudo') {
             steps {
                 sh '''
+                    echo "Checking if AWS SAM CLI is installed..."
                     if ! command -v sam &> /dev/null; then
                         echo "Installing AWS SAM CLI..."
                         curl -Lo aws-sam-cli-linux.zip https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip
                         rm -rf sam-installation  # Remove old installation if exists
                         mkdir -p sam-installation
                         unzip -o aws-sam-cli-linux.zip -d sam-installation  # Force overwrite
-                        ./sam-installation/install --install-dir $HOME/.local/bin
-                        chmod +x $HOME/.local/bin/sam  # Fix missing executable permissions
+                        ./sam-installation/install --install-dir $HOME/.local/bin --update
+                        chmod +x $HOME/.local/bin/sam  # Ensure it's executable
                         echo "AWS SAM installed successfully."
                     else
-                        echo "AWS SAM already installed."
+                        echo "AWS SAM is already installed."
                     fi
                     export PATH="$HOME/.local/bin:$PATH"
                     echo "Checking SAM Version..."

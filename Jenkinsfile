@@ -2,63 +2,28 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-1'
-        AWS_LAMBDA_FUNCTION_NAME = 'etranzactFunction'
-        S3_BUCKET = 'etranzact'
+        AWS_REGION = 'us-east-1'  // Change this to your AWS region
+        LAMBDA_FUNCTION_NAME = 'quarkusLambdaFunction'  // Change this to your Lambda function name
+        IMAGE_URI = 'docker.io/paketobuildpacks/quarkus:latest'
     }
 
     stages {
-        stage('Checkout Code') {
-            steps {
-                git 'https://github.com/ClementDaniel/etranzact-lambda.git'
-            }
-        }
-
-        stage('Install Java & Maven') {
+        stage('Deploy to AWS Lambda') {
             steps {
                 script {
-                    def javaHome = tool name: 'jdk-17', type: 'jdk'
-                    env.PATH = "${javaHome}/bin:${env.PATH}"
+                    sh '''
+                    aws lambda update-function-code \
+                        --function-name $LAMBDA_FUNCTION_NAME \
+                        --image-uri $IMAGE_URI
+                    '''
                 }
-            }
-        }
-
-        stage('Install AWS SAM') {
-            steps {
-                sh '''
-                    # Install AWS SAM CLI using Python pip (more reliable method)
-                    python3 -m pip install --user aws-sam-cli
-                    echo "Installed SAM version: $(~/.local/bin/sam --version)"
-                '''
-                script {
-                    // Add user's local bin directory to PATH
-                    env.PATH = "${env.HOME}/.local/bin:${env.PATH}"
-                }
-            }
-        }
-
-        stage('Build & Test') {
-            steps {
-                sh '''
-                    chmod +x mvnw
-                    ./mvnw clean verify
-                '''
-            }
-        }
-
-        stage('Build & Deploy with SAM') {
-            steps {
-                sh '''
-                    sam build --use-container
-                    sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
-                '''
             }
         }
     }
 
     post {
         success {
-            echo 'Deployment successful!'
+            echo 'Deployment to AWS Lambda was successful!'
         }
         failure {
             echo 'Deployment failed. Check logs for details.'

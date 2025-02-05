@@ -23,7 +23,7 @@ pipeline {
                     else
                         echo "AWS CLI already installed."
                     fi
-                    aws --version
+                    # aws --version
                 '''
             }
         }

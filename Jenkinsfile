@@ -15,15 +15,16 @@ pipeline {
                         echo "Installing AWS CLI..."
                         curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
                         unzip -o awscliv2.zip > /dev/null
-                        # sudo ./aws/install
+                        sudo ./aws/install
                         rm -rf aws awscliv2.zip
-                        # Explicitly add the AWS CLI binary location to PATH
-                        export PATH=$PATH:/usr/local/bin
                         echo "AWS CLI installed successfully."
                     else
                         echo "AWS CLI already installed."
                     fi
-                    # aws --version
+                    # Explicitly add the AWS CLI binary location to PATH
+                    export PATH=$PATH:/usr/local/bin
+                    echo "AWS CLI is available at: $(which aws)"
+                    aws --version
                 '''
             }
         }
@@ -33,7 +34,7 @@ pipeline {
                 script {
                     sh '''
                     echo "Deploying to AWS Lambda..."
-                    aws lambda update-function-code \
+                    /usr/local/bin/aws lambda update-function-code \
                         --function-name $LAMBDA_FUNCTION_NAME \
                         --image-uri $IMAGE_URI \
                         --region $AWS_REGION

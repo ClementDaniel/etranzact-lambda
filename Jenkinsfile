@@ -4,18 +4,19 @@ pipeline {
     environment {
         AWS_REGION = 'us-east-1'  // Change this to your AWS region
         LAMBDA_FUNCTION_NAME = 'quarkusLambdaFunction'  // Change this to your Lambda function name
-        IMAGE_URI = 'docker.io/paketobuildpacks/quarkus:latest'   
+        IMAGE_URI = 'docker.io/paketobuildpacks/quarkus:latest'
     }
 
     stages {
-        stage('Install AWS CLI') {
+        stage('Install AWS CLI if Missing') {
             steps {
                 sh '''
                     if ! command -v aws &> /dev/null; then
                         echo "Installing AWS CLI..."
-                        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-                        unzip awscliv2.zip
-                        # sudo ./aws/install
+                        curl -s "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+                        unzip -o awscliv2.zip > /dev/null
+                        sudo ./aws/install
+                        rm -rf aws awscliv2.zip
                         echo "AWS CLI installed successfully."
                     else
                         echo "AWS CLI already installed."
@@ -29,9 +30,12 @@ pipeline {
             steps {
                 script {
                     sh '''
+                    echo "Deploying to AWS Lambda..."
                     aws lambda update-function-code \
                         --function-name $LAMBDA_FUNCTION_NAME \
-                        --image-uri $IMAGE_URI
+                        --image-uri $IMAGE_URI \
+                        --region $AWS_REGION
+                    echo "Deployment completed successfully."
                     '''
                 }
             }

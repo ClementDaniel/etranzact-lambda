@@ -17,6 +17,8 @@ pipeline {
                         unzip -o awscliv2.zip > /dev/null
                         # sudo ./aws/install
                         rm -rf aws awscliv2.zip
+                        # Explicitly add the AWS CLI binary location to PATH
+                        export PATH=$PATH:/usr/local/bin
                         echo "AWS CLI installed successfully."
                     else
                         echo "AWS CLI already installed."
@@ -44,10 +46,10 @@ pipeline {
 
     post {
         success {
-            echo 'Deployment to AWS Lambda was successful!'
+            echo '✅ Deployment to AWS Lambda was successful!'
         }
         failure {
-            echo 'Deployment failed. Check logs for details.'
+            echo '❌ Deployment failed. Check logs for details.'
         }
     }
 }

@@ -1,16 +1,12 @@
+
 pipeline {
-    agent {
-        docker {
-            image 'quarkus/ubi-quarkus-mandrel:22.3-java17'  // Use Quarkus build image
-            args '--user root'  // Ensure root access for dependencies
-        }
-    }
+    agent any  // Runs on any available Jenkins agent
 
     environment {
         AWS_REGION = 'us-east-1'
         AWS_LAMBDA_FUNCTION_NAME = 'etranzactFunction'
-        S3_BUCKET = 'etranzact'  // S3 bucket for deployment
-        DEPLOYMENT_PACKAGE = 'target/function.zip'  // Output ZIP file
+        S3_BUCKET = 'etranzact'  // Replace with your S3 bucket
+        SAM_CLI_PATH = '/usr/local/bin/sam'  // Set default AWS SAM path
     }
 
     stages {
@@ -20,60 +16,64 @@ pipeline {
             }
         }
 
-        stage('Build Quarkus Lambda Function') {
+        stage('Install Java & Maven') {
+            steps {
+                script {
+                    def javaHome = tool name: 'jdk-17', type: 'jdk'  // Ensure JDK 17 is installed
+                    env.PATH = "${javaHome}/bin:${env.PATH}"
+                }
+            }
+        }
+
+        stage('Install AWS SAM') {
+            steps {
+                sh '''
+                    if ! command -v sam &> /dev/null; then
+                        echo "Installing AWS SAM CLI..."
+                        curl -Lo aws-sam-cli-linux.zip https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip
+                        rm -rf sam-installation  # Remove old installation if exists
+                        mkdir -p sam-installation
+                        unzip -o aws-sam-cli-linux.zip -d sam-installation  # Force overwrite
+                        # sudo./sam-installation/install
+                        echo "AWS SAM installed successfully."
+                    else
+                        echo "AWS SAM already installed."
+                    fi
+                    # /usr/local/bin/sam --version
+                '''
+                script {
+                    env.PATH = "/usr/local/bin:$PATH"  // Ensure Jenkins finds SAM CLI
+                }
+            }
+        }
+
+        stage('Build & Test') {
             steps {
                 sh '''
                     chmod +x mvnw  # Ensure Maven Wrapper is executable
-                    ./mvnw clean package -Dnative -Dquarkus.native.container-build=true  # Build native image
+                    ./mvnw compile quarkus:dev & sleep 30  # Run Quarkus dev mode for 30s
+                    ./mvnw clean package  # Package the application
                 '''
             }
         }
 
-        stage('Prepare Deployment Package') {
+        stage('Build & Deploy with SAM') {
             steps {
                 sh '''
-                    echo "Zipping deployment package..."
-                    zip -j $DEPLOYMENT_PACKAGE target/*-runner target/lib/*
+                    export PATH="/usr/local/bin:$PATH"  # Ensure Jenkins finds SAM
+                    sam build
+                    sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
                 '''
-            }
-        }
-
-        stage('Deploy to AWS Lambda via SDK') {
-            steps {
-                script {
-                    def awsLambdaUpdateScript = '''
-                    import boto3
-
-                    AWS_REGION = "us-east-1"
-                    LAMBDA_FUNCTION_NAME = "etranzactFunction"
-                    ZIP_FILE_PATH = "target/function.zip"
-
-                    client = boto3.client('lambda', region_name=AWS_REGION)
-
-                    with open(ZIP_FILE_PATH, 'rb') as f:
-                        zip_content = f.read()
-
-                    response = client.update_function_code(
-                        FunctionName=LAMBDA_FUNCTION_NAME,
-                        ZipFile=zip_content
-                    )
-
-                    print("Deployment complete:", response)
-                    '''
-
-                    writeFile(file: 'deploy_lambda.py', text: awsLambdaUpdateScript)
-                    sh 'python3 deploy_lambda.py'  // Run the Python script
-                }
             }
         }
     }
 
     post {
         success {
-            echo '✅ Deployment successful!'
+            echo 'Deployment successful!'
         }
         failure {
-            echo '❌ Deployment failed. Check logs for details.'
+            echo 'Deployment failed. Check logs for details.'
         }
     }
 }

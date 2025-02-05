@@ -2,36 +2,39 @@ pipeline {
     agent any
 
     environment {
-        AWS_REGION = 'us-east-1'
-        LAMBDA_FUNCTION_NAME = 'quarkusLambdaFunction'
+        AWS_REGION = 'us-east-1'  // Change this to your AWS region
+        LAMBDA_FUNCTION_NAME = 'quarkusLambdaFunction'  // Change this to your Lambda function name
         IMAGE_URI = 'docker.io/paketobuildpacks/quarkus:latest'
-        AWS_ACCESS_KEY_ID = credentials('AWS_ACCESS_KEY_ID')
-        AWS_SECRET_ACCESS_KEY = credentials('AWS_SECRET_ACCESS_KEY')
     }
 
     stages {
-        stage('Deploy to AWS Lambda Without AWS CLI') {
+        stage('Install sudo on Jenkins Agent') {
             steps {
-                sh '''
-                    STS_TOKEN=$(curl -s -X POST "https://sts.amazonaws.com/" \
-                        -H "Content-Type: application/x-www-form-urlencoded" \
-                        --data-urlencode "Action=GetCallerIdentity" \
-                        --data-urlencode "Version=2011-06-15" \
-                        --data-urlencode "AWSAccessKeyId=$AWS_ACCESS_KEY_ID" \
-                        --data-urlencode "AWSSecretAccessKey=$AWS_SECRET_ACCESS_KEY")
+                script {
+                    sh '''
+                    echo "Installing sudo on Jenkins agent..."
+                    docker exec -it jenkins-agent bash -c "apt-get update && apt-get install -y sudo"
+                    '''
+                }
+            }
+        }
 
-                    curl -X PUT "https://lambda.$AWS_REGION.amazonaws.com/2015-03-31/functions/$LAMBDA_FUNCTION_NAME/code" \
-                        -H "Content-Type: application/json" \
-                        -H "Authorization: Bearer $STS_TOKEN" \
-                        -d '{"ImageUri": "'$IMAGE_URI'"}'
-                '''
+        stage('Deploy to AWS Lambda') {
+            steps {
+                script {
+                    sh '''
+                    aws lambda update-function-code \
+                        --function-name $LAMBDA_FUNCTION_NAME \
+                        --image-uri $IMAGE_URI
+                    '''
+                }
             }
         }
     }
 
     post {
         success {
-            echo '✅ Deployment successful using AWS Lambda API!'
+            echo '✅ Deployment to AWS Lambda was successful!'
         }
         failure {
             echo '❌ Deployment failed. Check logs for details.'

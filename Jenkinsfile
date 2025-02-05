@@ -1,12 +1,10 @@
-
 pipeline {
-    agent any  // Runs on any available Jenkins agent
+    agent any
 
     environment {
         AWS_REGION = 'us-east-1'
         AWS_LAMBDA_FUNCTION_NAME = 'etranzactFunction'
-        S3_BUCKET = 'etranzact'  // Replace with your S3 bucket
-        SAM_CLI_PATH = '/usr/local/bin/sam'  // Set default AWS SAM path
+        S3_BUCKET = 'etranzact'
     }
 
     stages {
@@ -19,7 +17,7 @@ pipeline {
         stage('Install Java & Maven') {
             steps {
                 script {
-                    def javaHome = tool name: 'jdk-17', type: 'jdk'  // Ensure JDK 17 is installed
+                    def javaHome = tool name: 'jdk-17', type: 'jdk'
                     env.PATH = "${javaHome}/bin:${env.PATH}"
                 }
             }
@@ -28,21 +26,13 @@ pipeline {
         stage('Install AWS SAM') {
             steps {
                 sh '''
-                    if ! command -v sam &> /dev/null; then
-                        echo "Installing AWS SAM CLI..."
-                        curl -Lo aws-sam-cli-linux.zip https://github.com/aws/aws-sam-cli/releases/latest/download/aws-sam-cli-linux-x86_64.zip
-                        rm -rf sam-installation  # Remove old installation if exists
-                        mkdir -p sam-installation
-                        unzip -o aws-sam-cli-linux.zip -d sam-installation  # Force overwrite
-                        # sudo./sam-installation/install
-                        echo "AWS SAM installed successfully."
-                    else
-                        echo "AWS SAM already installed."
-                    fi
-                    # /usr/local/bin/sam --version
+                    # Install AWS SAM CLI using Python pip (more reliable method)
+                    python3 -m pip install --user aws-sam-cli
+                    echo "Installed SAM version: $(~/.local/bin/sam --version)"
                 '''
                 script {
-                    env.PATH = "/usr/local/bin:$PATH"  // Ensure Jenkins finds SAM CLI
+                    // Add user's local bin directory to PATH
+                    env.PATH = "${env.HOME}/.local/bin:${env.PATH}"
                 }
             }
         }
@@ -50,9 +40,8 @@ pipeline {
         stage('Build & Test') {
             steps {
                 sh '''
-                    chmod +x mvnw  # Ensure Maven Wrapper is executable
-                    ./mvnw compile quarkus:dev & sleep 30  # Run Quarkus dev mode for 30s
-                    ./mvnw clean package  # Package the application
+                    chmod +x mvnw
+                    ./mvnw clean verify
                 '''
             }
         }
@@ -60,8 +49,7 @@ pipeline {
         stage('Build & Deploy with SAM') {
             steps {
                 sh '''
-                    export PATH="/usr/local/bin:$PATH"  # Ensure Jenkins finds SAM
-                    sam build
+                    sam build --use-container
                     sam deploy --no-confirm-changeset --no-fail-on-empty-changeset
                 '''
             }

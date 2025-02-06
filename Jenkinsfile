@@ -53,10 +53,10 @@ pipeline {
 
     post {
         success {
-            echo '✅ Deployment to AWS Lambda was successful!'
+            echo 'Deployment to AWS Lambda was successful!'
         }
         failure {
-            echo '❌ Deployment failed. Check logs for details.'
+            echo 'Deployment failed. Check logs for details.'
         }
     }
 }

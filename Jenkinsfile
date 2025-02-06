@@ -7,9 +7,9 @@ pipeline {
     }
 
     environment {
-        AWS_REGION = 'us-east-1'                      // Your AWS region
-        LAMBDA_FUNCTION_NAME = 'quarkusLambdaFunction'  // Your AWS Lambda function name
-        IMAGE_URI = 'docker.io/paketobuildpacks/quarkus:latest' // Public DockerHub image URI
+        AWS_REGION = 'us-east-1'  // Change to your AWS region
+        AWS_LAMBDA_FUNCTION_NAME = 'etranzactFunction'
+        S3_BUCKET = 'etranzact'  // Replace with your S3 bucket
     }
 
     stages {
@@ -19,44 +19,49 @@ pipeline {
             }
         }
 
-        stage('Build Application') {
+        stage('Set Up Java & Maven') {
             steps {
-                sh '''
-                    chmod +x mvnw
-                    ./mvnw clean package
-                '''
+                script {
+                    def javaHome = tool name: 'JDK 17', type: 'jdk'  // Ensure JDK is installed in Jenkins
+                    env.PATH = "${javaHome}/bin:${env.PATH}"
+                }
             }
         }
+        stage('Build & Test') {
+    steps {
+        withMaven(maven: 'Maven 3.8.6') {
+            sh 'mvn clean package'
+        }
+    }
+}
 
-        stage('Prepare Dependencies') {
+        stage('Upload to S3') {
             steps {
                 sh '''
-                    # (Optional) Use Maven dependency:copy-dependencies goal to copy all dependencies into target/dependency/
-                    ./mvnw dependency:copy-dependencies -DoutputDirectory=target/dependency
+                    ARTIFACT=$(ls target/*.jar | head -n 1)
+                    aws s3 cp $ARTIFACT s3://$S3_BUCKET/
+                    echo "Uploaded $ARTIFACT to S3"
                 '''
             }
         }
 
         stage('Deploy to AWS Lambda') {
             steps {
-                script {
-                    // Compile and run the deployment class using the AWS SDK.
-                    // Adjust the classpath as needed (here it uses target/dependency/* for external libraries)
-                    sh '''
-                        javac -cp "target/dependency/*:." deployment/LambdaDeployer.java
-                        java -cp "target/dependency/*:." LambdaDeployer
-                    '''
-                }
+                sh '''
+                    ARTIFACT=$(ls target/*.jar | head -n 1)
+                    aws lambda update-function-code --function-name $AWS_LAMBDA_FUNCTION_NAME --s3-bucket $S3_BUCKET --s3-key $(basename $ARTIFACT)
+                '''
             }
         }
     }
 
     post {
         success {
-            echo ' Deployment to AWS Lambda was successful!'
+            echo 'Deployment successful!'
         }
         failure {
-            echo ' Deployment failed. Check logs for details.'
+            echo 'Deployment failed.'
         }
     }
 }
+
